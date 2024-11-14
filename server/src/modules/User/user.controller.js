@@ -33,8 +33,8 @@ export const signIn = catchAsyncError(async (req, res, next) => {
   let user = await userModel.findOne({ email });
   if (
     !user ||
-    !(await bcrypt.compare(password, user.password)) ||
-    user.isVerified == false
+    !(await bcrypt.compare(password, user.password))
+    // user.isVerified == false
   )
     return next(
       new AppError(
@@ -48,7 +48,7 @@ export const signIn = catchAsyncError(async (req, res, next) => {
       userId: user._id,
       userEmail: user.email,
       isDeleted: user.isDeleted,
-      isVerified: user.isVerified,
+      // isVerified: user.isVerified,
     },
     process.env.JWT_LOGIN_KEY,
     { expiresIn: "6h" }
@@ -64,7 +64,7 @@ export const verifyUser = catchAsyncError(async (req, res, next) => {
   const decoded = jwt.verify(token, process.env.JWT_VERIFICATION_KEY);
   let user = await userModel.findOneAndUpdate(
     { email: decoded.email },
-    { isVerified: true },
+    // { isVerified: true },
     { new: true }
   );
   user
@@ -91,6 +91,24 @@ export const updateUser = catchAsyncError(async (req, res, next) => {
   user?.modifiedCount
     ? res.status(200).json({ status: 200, message: "success", user })
     : next(new AppError("failed", 400));
+});
+
+export const updateUserPartial = catchAsyncError(async (req, res, next) => {
+  const { name, phone } = req.body;
+  const userId = req.userId;
+
+  // Find the user and update its fields
+  const user = await userModel.findByIdAndUpdate(
+    userId,
+    { name, phone },
+    { new: true, runValidators: true } // 'new: true' returns the updated document
+  );
+
+  if (!user) {
+    return next(new AppError("Failed to update user data", 400));
+  }
+
+  res.status(200).json({ status: 200, message: "success", user });
 });
 
 export const deleteUser = catchAsyncError(async (req, res, next) => {
@@ -126,26 +144,44 @@ export const forgetPassword = catchAsyncError(async (req, res, next) => {
     { new: true }
   );
   if (user) {
-    sendEmail({ email, html: resetPasswordHTML(token) });
-    return res.status(200).json({ status: 200, message: "success" });
+    sendEmail({ email, token ,html: resetPasswordHTML(token) });
+    return res.status(200).json({ status: 200, message: "success", token });
   }
   next(new AppError("failed", 400));
 });
 
 export const resetPassword = catchAsyncError(async (req, res, next) => {
-  const token = req.header("token");
-  const { password } = req.body;
-  const hash = bcrypt.hashSync(password, 8);
+  const { token } = req.params;  // Token is sent in the URL as a parameter
+  const { password } = req.body; // New password sent in the body
+
+  // Find the user with the matching reset token
   const user = await userModel.findOne({ resetToken: token });
-  if (user) {
-    await userModel.updateOne(
-      { resetToken: token },
-      { password: hash, $unset: { resetToken: 1 } }
-    );
-    return res.status(200).json({ status: 200, message: "success" });
+
+  if (!user) {
+    // If no user found with the given reset token, return an error
+    return next(new AppError('Invalid or expired token', 400));
   }
-  next(new AppError("failed", 400));
+
+  // Compare the new password with the current password
+  const isSamePassword = bcrypt.compareSync(password, user.password);
+  if (isSamePassword) {
+    // If the new password is the same as the current password, return an error
+    return next(new AppError('You cannot set the same password as your current password', 400));
+  }
+
+  // Hash the new password
+  const hashedPassword = bcrypt.hashSync(password, 8);
+
+  // Update the user's password and remove the reset token
+  await userModel.updateOne(
+    { resetToken: token },
+    { password: hashedPassword, $unset: { resetToken: 1 } }
+  );
+
+  // Return a success response
+  return res.status(200).json({ status: 200, message: 'Password reset successful' });
 });
+
 
 export const changePassword = catchAsyncError(async (req, res, next) => {
   const { oldPassword, newPassword, ConfirmPassword } = req.body;

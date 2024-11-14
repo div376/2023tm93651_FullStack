@@ -1,21 +1,24 @@
 import axios from 'axios';
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Sidebar from '../Sidebar/Sidebar';
 import Modal from "react-bootstrap/Modal";
 import Button from "react-bootstrap/Button";
 
-
 export default function Book() {
-    const [bookData, setBookData] = useState([]);
-    const[duration,setDuaration] = useState(null);
-    const [show, setShow] = useState(false);
-    const handleClose = () => setShow(false);
-    const handleShow = () => setShow(true);
-    let allURLParams = useParams();
+  const [bookData, setBookData] = useState({
+    title: '',
+    author: '',
+    genre: '',
+    condition: '',
+    availabilityStatus: ''
+  });
+  const [show, setShow] = useState(false);
+  let allURLParams = useParams();
 
+  // Function to fetch the book data
   async function getBookData() {
-    let {data} = await axios.get(`http://localhost:5000/book/books/${allURLParams.id}`, {
+    let { data } = await axios.get(`http://localhost:5000/book/${allURLParams.id}`, {
       headers: {
         token: localStorage.getItem('userToken')
       },
@@ -23,64 +26,129 @@ export default function Book() {
     setBookData(data.book);
   }
 
-
-
-  const issueBook = async (e) => {
-    
+  // Function to handle editing the book details
+  const editBook = async (e) => {
+    e.preventDefault();  // Prevent default form submission
 
     try {
-      const {data} = await axios.post('http://localhost:5000/book/issue' ,{bookId:bookData._id,issuedDurationInDays:duration}, {
-          headers: {
-            token: localStorage.getItem('userToken')
-          },
-        });
+      // Create the object with updated data
+      const updatedData = {
+        title: bookData.title,
+        author: bookData.author,
+        genre: bookData.genre,
+        condition: bookData.condition,
+        availabilityStatus: bookData.availabilityStatus
+      };
+
+      // Make the PATCH request to update the book data
+      const { data } = await axios.patch(`http://localhost:5000/book/${bookData._id}`, updatedData, {
+        headers: {
+          token: localStorage.getItem('userToken'),
+          'Content-Type': 'application/json'
+        },
+      });
+
       console.log(data);
-      if(data?.message === "success")
-      {
-            getBookData()
+      if (data?.message === "Book updated successfully") {
+        getBookData();  // Refresh the book data after editing
+        setShow(false); // Close the modal
+        console.log('Modal should close now'); // Log to confirm
+      } else {
+        alert('Failed to update book details'); // Handle unexpected responses
       }
     } catch (error) {
-      console.log(error);
+      console.error('Error updating book:', error);
+      alert('An error occurred while updating the book details'); // Provide user feedback on error
     }
   };
 
-  useEffect(() => {getBookData();}, []);
+  // Fetch book data when the component is mounted
+  useEffect(() => {
+    getBookData();
+  }, []);
+
   return (
     <>
-     <Modal
+      <Modal
         show={show}
-        onHide={handleClose}
+        onHide={() => setShow(false)}
         animation={true}
         size="md"
         aria-labelledby="contained-modal-title-vcenter"
         centered
       >
         <Modal.Header closeButton>
-          <Modal.Title>Issue Book</Modal.Title>
+          <Modal.Title>Edit Book</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <form className="py-3">
-              
-                <input
-                  onChange={(e) => setDuaration(e.target.value)}
-                  className="form-control w-100"
-                  name="path"
-                  placeholder="Enter The Duration"
-                  type="number"
-                />
-          
+          <form className="py-3" onSubmit={editBook}>
+            {/* Title Field */}
+            <input
+              className="form-control mb-3"
+              name="title"
+              value={bookData.title}
+              onChange={(e) => setBookData({ ...bookData, title: e.target.value })}
+              placeholder="Enter Title"
+            />
+            {/* Author Field */}
+            <input
+              className="form-control mb-3"
+              name="author"
+              value={bookData.author}
+              onChange={(e) => setBookData({ ...bookData, author: e.target.value })}
+              placeholder="Enter Author"
+            />
+            {/* Genre Field */}
+            <select
+              className="form-control mb-3"
+              name="genre"
+              value={bookData.genre}
+              onChange={(e) => setBookData({ ...bookData, genre: e.target.value })}
+            >
+              <option value="">Select Genre</option>
+              <option value="Fiction">Fiction</option>
+              <option value="Non-Fiction">Non-Fiction</option>
+              <option value="Science Fiction">Science Fiction</option>
+              <option value="Fantasy">Fantasy</option>
+              <option value="Mystery">Mystery</option>
+              <option value="Biography">Biography</option>
+            </select>
+            {/* Condition Field */}
+            <select
+              className="form-control mb-3"
+              name="condition"
+              value={bookData.condition}
+              onChange={(e) => setBookData({ ...bookData, condition: e.target.value })}
+            >
+              <option value="">Select Condition</option>
+              <option value="Good">Good</option>
+              <option value="Bad">Bad</option>
+              <option value="Worse">Worse</option>
+            </select>
+            {/* Availability Status Field */}
+            <select
+              className="form-control mb-3"
+              name="availabilityStatus"
+              value={bookData.availabilityStatus}
+              onChange={(e) => setBookData({ ...bookData, availabilityStatus: e.target.value })}
+            >
+              <option value="">Select Availability Status</option>
+              <option value="Available">Available</option>
+              <option value="Not Available">Not Available</option>
+            </select>
           </form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={handleClose}>
+          <Button variant="secondary" onClick={() => setShow(false)}>
             Close
           </Button>
-          <Button variant="danger" className='text-white' onClick= {()=>{handleClose();issueBook();}}>
+          <Button variant="danger" className='text-white' onClick={editBook}>
             Save Changes
           </Button>
         </Modal.Footer>
-    </Modal>
-    <div className="overflow-hidden">
+      </Modal>
+
+      <div className="overflow-hidden">
         <div className="row">
           <div className="col-2">
             <div className="position-fixed col-lg-2">
@@ -90,27 +158,40 @@ export default function Book() {
 
           <div className="col-10 px-lg-5 px-2 my-3">
             <div className="row">
-                <div className="col-lg-4">
-                  <div className='p-5'>
-                  <img className='w-100 rounded-2' src={`http://localhost:5000/${bookData.bookPhoto}`} alt="" />
-                    <h4 className='text-center p-3 pb-0 fw-bolder'>{bookData.name}</h4>
-                    <p className='text-center text-secondary fw-light'>{bookData.publisher}</p>
-                  </div>
+              <div className="col-lg-4">
+                <div className='p-5'>
+                  <img 
+                    className='w-100 rounded-2' 
+                    src={`http://localhost:5000/4e5af2d3-c6be-441b-bcce-e5ef4072f080-55411076%20copy.jpg`} 
+                    alt={bookData.title} 
+                    style={{
+                      height: 'auto', // Ensure the image's height adjusts properly based on the aspect ratio
+                      maxHeight: '350px', // Optional: set a max height if needed
+                      objectFit: 'contain' // Ensures the image fits inside the container without being cut off
+                    }}
+                  />
+                  <h4 className='text-center p-3 pb-0 fw-bolder'>{bookData.title}</h4>
+                  <p className='text-center text-secondary fw-light'>{bookData.author}</p>
                 </div>
-                <div className="col-lg-8 my-1">
-                    <div className='p-lg-5 px-5'>
-                    <p className='d-none d-lg-block'><span className='fw-bold'>Categoty</span> : {bookData.category}</p>
-                    <p className='d-none d-lg-block'><span className='fw-bold'>Issued</span> : {bookData.isIssued? "Yes" : "No"}</p>
-                    <p className='text-secondary d-none d-lg-block fs-6'><span className='fw-bold text-black'>Description</span> : {`${bookData.name} doing a thing for its inherent satisfaction rather than external rewards—is the key to success and satisfaction in any endeavor. A legendary performance coach shares his simple, proven, and fun methods for cultivating and keeping it. To be productive and optimistic about our personal and professional lives, we want to feel that we can understand and influence what is happening around us today, and that we have a reliable insight into what will happen tomorrow. We also require a rich, supportive, and secure social life. As more of us work remotely and the frequency of our in-person contact decreases, this desire for connection and trust has only become more important; the social drive is so strong that our body temperature drops when we feel excluded. To satisfy our psychological needs in today’s professional world, we must pursue them consciously and purposefully—but unfortunately, most of us don't know how to do so effectively.`}</p>
-                    {bookData.isIssued?null:<button variant="primary" onClick={handleShow} className='btn btn-danger w-100 mb-3'>Issue this book now</button>}
-                
-                    </div>
+              </div>
+              <div className="col-lg-8 my-1">
+                <div className='p-lg-5 px-5'>
+          
+                  <p className='d-none d-lg-block'><span className='fw-bold'>Genre</span> : {bookData.genre}</p>
+                  <p className='d-none d-lg-block'><span className='fw-bold'>Availability Status</span> : {bookData.availabilityStatus ? "Available" : "Not Available"}</p>
+                  <p className='d-none d-lg-block'><span className='fw-bold'>Condition</span> : {bookData.condition}</p>
+                  <button
+                    variant="primary"
+                    onClick={() => setShow(true)}
+                    className='btn btn-danger w-100 mb-3'>
+                    Edit Book Details
+                  </button>
                 </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    
     </>
-  )
+  );
 }

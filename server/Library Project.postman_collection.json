@@ -32,7 +32,7 @@
 							"port": "5000",
 							"path": [
 								"user",
-								"signin"
+								"login"
 							]
 						}
 					},
@@ -53,7 +53,7 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:5000/user/signup",
+							"raw": "http://localhost:5000/user/register",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -61,7 +61,7 @@
 							"port": "5000",
 							"path": [
 								"user",
-								"signup"
+								"register"
 							]
 						}
 					},

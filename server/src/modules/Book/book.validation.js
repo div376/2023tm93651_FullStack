@@ -1,11 +1,14 @@
 import Joi from "joi";
 
 
+
 export const bookSchema = {
-    body:Joi.object({
-        name:Joi.string().min(3).max(20).required(),
-        category:Joi.string().min(3).max(20).required(),
-        publisher:Joi.string().min(3).max(20).required(),
+    body: Joi.object({
+        title: Joi.string().min(3).max(50).required(),
+        author: Joi.string().min(3).max(50).required(),
+        genre: Joi.string().min(3).max(50).required(),
+        condition: Joi.string().min(3).max(50).required(),
+        availabilityStatus: Joi.string().min(3).max(50).required(),
     })
 }
 

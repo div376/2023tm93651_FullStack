@@ -3,112 +3,138 @@ import bookModel from "../../../database/models/bookModel.js";
 import userModel from "../../../database/models/userModel.js";
 import { AppError } from "../../utils/AppError.js";
 import { catchAsyncError } from "../../utils/catchAsyncError.js";
+import mongoose from 'mongoose';
 
+import shortid from 'shortid';
 
+export const addBook = catchAsyncError(async (req, res, next) => {
+    const { title, author, genre, condition, availabilityStatus } = req.body;
 
-export const addBook = catchAsyncError(async(req,res,next)=>{
-    const {name,category,publisher} = req.body
-    const book = await bookModel.insertMany({name,category,publisher,bookPhoto:req.file.filename})
-    book ? res.status(200).json({status:200,message:"success"}) : next(new AppError("failed to insert user",400))
+    try {
+        const book = await bookModel.create({
+            bookId: shortid.generate(), // Generate a unique bookId
+            title,
+            author,
+            genre,
+            condition,
+            availabilityStatus,
+            bookPhoto: req.file.filename,
+            userId: req.bookUser
+        });
+
+        const userBook = await userModel.findByIdAndUpdate(
+            req.userId,
+            {
+                $push: {
+                    userBooks:
+
+                    {
+                        bookId: book.bookId,
+                        title: book.title,
+                        author: book.author,
+                        genre: book.genre,
+                        condition: book.condition,
+                        availabilityStatus: book.availabilityStatus,
+                    }
+                }
+            },
+            { new: true }
+        );
+
+        res.status(200).json({ status: 200, message: "success", book });
+    } catch (error) {
+        if (error.code === 11000) { // Duplicate key error code
+            return next(new AppError("Book with this title or ID already exists", 400));
+        }
+        next(new AppError("Failed to insert book", 400));
+    }
+});
+
+export const getAllBooks = catchAsyncError(async (req, res, next) => {
+    const books = await bookModel.find().sort({ createdAt: -1 });
+    res.status(200).json({ status: 200, message: "success", books })
 })
 
-
-export const getAllBooks = catchAsyncError(async(req,res,next)=>{
-    const books = await bookModel.find().sort({createdAt: -1});
-    res.status(200).json({status:200,message:"success",books})
+export const getAllBooksByName = catchAsyncError(async (req, res, next) => {
+    let { letters } = req.params
+    const books = await bookModel.find({ name: { $regex: letters, $options: 'i' } }).sort({ createdAt: -1 }).exec();
+    res.status(200).json({ status: 200, message: "success", books })
 })
 
-export const getAllBooksByName = catchAsyncError(async(req,res,next)=>{
-    let {letters} = req.params
-    const books = await bookModel.find({name:{$regex:letters,$options:'i'}}).sort({ createdAt: -1 }).exec();
-    res.status(200).json({status:200,message:"success",books})
-})
-
-export const getBookById = catchAsyncError(async(req,res,next)=>{
-    const {id} = req.params
+export const getBookById = catchAsyncError(async (req, res, next) => {
+    const { id } = req.params
     const book = await bookModel.findById(id)
-    res.status(200).json({status:200,message:"success",book})
+    res.status(200).json({ status: 200, message: "success", book })
 })
 
 
-export const issueBook = catchAsyncError(async(req,res,next)=>{
-    const {bookId,issuedDurationInDays} = req.body;
-    let issuedBookUser = req.userId
-    const book = await bookModel.findById(bookId);
-    if(book && !book.isIssued)
-    {
-        // it should be like this but to test return book I can't do that.
-        // const issuedBook = await bookModel.findByIdAndUpdate({_id:bookId},{issuedBookUser,isIssued:true,issueDate:moment(),
-        //     returnDate:moment().add(issuedDurationInDays,'days')},{new:true})
-        const issuedBook = await bookModel.findByIdAndUpdate({_id:bookId},{issuedBookUser,isIssued:true,issueDate:moment(),returnDate:moment().add(issuedDurationInDays,'days')},{new:true})
-        if(issuedBook)
-        {
-            res.status(200).json({status:200,message:"success"})
-        }
-        else
-        {
-            next(new AppError("failed",400))
-        }
+export const searchBooks = catchAsyncError(async (req, res, next) => {
+    const { title, author, genre, condition, availabilityStatus, page = 1, limit = 10 } = req.query;
+
+    const query = {};
+    if (title) query.title = { $regex: title, $options: 'i' }; // case-insensitive
+    if (author) query.author = { $regex: author, $options: 'i' };
+    if (genre) query.genre = genre;
+    if (condition) query.condition = condition;
+    if (availabilityStatus !== undefined) query.availabilityStatus = availabilityStatus;
+
+    const books = await bookModel.find(query)
+        .skip((page - 1) * limit)
+        .limit(parseInt(limit));
+
+    const totalBooks = await bookModel.countDocuments(query);
+
+    res.json({
+        books,
+        totalResults: totalBooks, // Add totalResults to the response
+        totalPages: Math.ceil(totalBooks / limit),
+        currentPage: parseInt(page)
+    });
+});
+
+
+export const editBook = catchAsyncError(async (req, res, next) => {
+    const { bookId } = req.params; // Get the book ID from URL parameters
+    const { title, author, genre, condition, availabilityStatus } = req.body; // Get the updated data from the request body
+
+    // Find the book and update its fields
+    const book = await bookModel.findByIdAndUpdate(bookId, {
+        title,
+        author,
+        genre,
+        condition,
+        availabilityStatus,
+        bookPhoto: req.file ? req.file.filename : undefined,  // Update book photo if new photo is uploaded
+    }, { new: true, runValidators: true }); // 'new: true' ensures that the updated document is returned
+
+    if (!book) {
+        return next(new AppError("Book not found", 404)); // Handle case where book isn't found
     }
 
-    else
-    {
-        next(new AppError("failed",400))
+    res.status(200).json({
+        status: 200,
+        message: "Book updated successfully",
+        book
+    });
+});
+
+
+export const deleteBook = catchAsyncError(async (req, res, next) => {
+    const { bookId } = req.params;  // Get the book ID from the query parameter
+    // Check if the bookId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(bookId)) {
+        return next(new AppError("Invalid book ID format", 400));  // Return error if the ID is invalid
     }
-})
+    // Find and delete the book by its ID
+    const book = await bookModel.findByIdAndDelete(bookId);
 
-
-export const returnBook = catchAsyncError(async(req,res,next)=>{
-    const {bookId} = req.body;
-    const issuedBookUser = req.userId;
-    const issuedBook = await bookModel.findOne({_id:bookId,issuedBookUser})
-    if(issuedBook)
-    {
-        let late = moment().diff(issuedBook.returnDate,"days")
-        if(late<0)
-        {
-            late=0
-        }
-        const fine = late*50;
-        let returnedBook = await bookModel.findByIdAndUpdate(bookId,{isIssued:false,late,fine},{new:true})
-        if(returnedBook)
-        {
-            await userModel.findByIdAndUpdate({_id:issuedBookUser},{ $push: { issuedBooks: returnedBook }})
-            await bookModel.updateOne({_id:bookId},{$unset: { issueDate: 1,returnDate:1,late:1,fine:1,issuedBookUser:1 }})
-            res.status(200).json({status:200,message:"success"})
-        }
-        else
-        {
-            next(new AppError("failed",400))
-        }
+    if (!book) {
+        return next(new AppError("Book not found", 404));  // Handle case where book is not found
     }
-    else
-    {
-        next(new AppError("book not found or not issued",400))
-    }
-})
 
-
-export const getIssuedBooks = catchAsyncError(async(req,res,next)=>{
-    let _id = req.userId;
-    const user = await userModel.findById(_id);
-    const issuedBooks = user.issuedBooks
-    
-    user ? res.status(200).json({status:200,message:"success" , issuedBooks}) : next(new AppError("failed",400))
-})
-
-
-export const getNonReturnedBooks = catchAsyncError(async(req,res,next)=>{
-    const issuedBookUser = req.userId;
-    let nonReturnedBooks = await bookModel.find({issuedBookUser}).sort({returnDate: 1});
-    res.status(200).json({status:200,message:"success",nonReturnedBooks})
-})
-
-
-export const searchIssuedBooks = catchAsyncError(async(req,res,next)=>{
-    const {bookName} = req.params
-    let _id = req.userId;
-    const user = await userModel.findById(_id).sort({returnDate: 1});
-    const issuedBooks = (user.issuedBooks).filter((book) => book.name.toLowerCase().includes(bookName.toLowerCase()) )
-    user ? res.status(200).json({status:200,message:"success" , issuedBooks}) : next(new AppError("failed",400))
-})
+    // Send response if the book is successfully deleted
+    res.status(200).json({
+        status: 200,
+        message: "Book deleted successfully"
+    });
+});

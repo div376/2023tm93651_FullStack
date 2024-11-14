@@ -9,15 +9,16 @@ const router = Router();
 
 
 
-router.post('/signup',validation(userValidation.signUpSchema),userController.signUp)
-router.post("/signin" , validation(userValidation.signInSchema), userController.signIn)
+router.post('/register',validation(userValidation.signUpSchema),userController.signUp)
+router.post("/login" , validation(userValidation.signInSchema), userController.signIn)
 router.get('/',userAuth, userController.getUserData)
 router.put('/',validation(userValidation.updateUserSchema),userAuth, userController.updateUser)
+router.patch('/',validation(userValidation.updateUserSchema),userAuth, userController.updateUserPartial)
 router.delete('/',userAuth, userController.deleteUser)
 router.patch('/',userAuth, userController.softDeleteUser)
 router.get('/verify/:token' , userController.verifyUser)
 router.post('/forget_password',validation(userValidation.emailSchema),userController.forgetPassword)
-router.patch('/reset_password',verifyResetPasswordToken,validation(userValidation.passwordSchema),userController.resetPassword)
+router.post('/reset_password/:token',validation(userValidation.passwordSchema),userController.resetPassword)
 router.put('/changePassword',userAuth,validation(userValidation.changePasswordSchema),userController.changePassword)
 router.patch('/logout',userAuth,userController.logout)
 
