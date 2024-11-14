@@ -1,40 +1,40 @@
-Frontend Setup
+#Frontend Setup
 
-# 1. Clone the project
+ 1. Clone the project
 git clone https://github.com/2023TM93651-fullstack.git
 
-# 2. Navigate to the client folder
+2. Navigate to the client folder
 cd client
 
-# 3. Install dependencies
+ 3. Install dependencies
 npm install
 
-# 4. Start the development server
+4. Start the development server
 npm run start
 
-# 5. Access the app in your browser at:
-# http://localhost:3000
+5. Access the app in your browser at:
+http://localhost:3000
 
 
-Backend setup 
+#Backend setup 
 
-# 1. Clone the project
+1. Clone the project
 git clone https://github.com/2023TM93651-fullstack.git
 
-# 2. Navigate to the client folder
+2. Navigate to the client folder
 cd server
 
-# 3. Install dependencies
+3. Install dependencies
 npm install
 
-# 4. Start the development server
+4. Start the development server
 node index.js
 
-# 5. Access all the apis at this location
+5. Access all the apis at this location
 http://localhost:5000
 
 
-Data base setup 
+#Data base setup 
 
 1.Install MongoDB (if not installed)
 
